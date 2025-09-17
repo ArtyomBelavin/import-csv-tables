@@ -1,8 +1,24 @@
-export type FieldType = "Number" | "Text" | "Date" | "Boolean" | "Unknown";
+export type LeadField =
+  | "website"
+  | "twitter"
+  | "facebook"
+  | "linkedIn"
+  | "youtube"
+  | "telegram"
+  | "leadSourceId"
+  | "firstName"
+  | "lastName"
+  | "middleName"
+  | "email"
+  | "leadCategory"
+  | "phone"
+  | "accountableManagerId";
 
 export interface LeadColumnInfo {
-  name: string;
-  type: FieldType;
-  status: "Detected" | "Not Detected" | "Optional";
+  columnName: string;
+  mappedField?: LeadField;
+  required: boolean;
+  type: string;
+  status: "Detected" | "Not Detected";
   description: string;
 }

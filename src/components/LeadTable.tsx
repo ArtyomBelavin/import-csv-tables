@@ -4,7 +4,7 @@ import {
   flexRender,
   ColumnDef,
 } from "@tanstack/react-table";
-import { LeadColumnInfo } from "../types";
+import type { LeadColumnInfo } from "../types";
 
 interface Props {
   columnsInfo: LeadColumnInfo[];

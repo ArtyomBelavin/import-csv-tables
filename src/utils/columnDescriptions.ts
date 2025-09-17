@@ -1,13 +1,18 @@
-const descriptions: Record<string, string> = {
-  Name: "Full name of the lead",
-  Email: "Primary email address",
-  Phone: "Phone number",
-  Company: "Company name",
-  Department: "Department or team",
-  "Date Created": "Date when lead was created",
-  Enabled: "Whether the lead is active (Yes/No)",
-};
+import type { LeadField } from "../types";
 
-export default function getDescription(columnName: string) {
-  return descriptions[columnName] || "No description available.";
-}
+export const columnDescriptions: Record<LeadField, string> = {
+  website: "Website URL of the lead",
+  twitter: "Twitter profile link",
+  facebook: "Facebook profile link",
+  linkedIn: "LinkedIn profile link",
+  youtube: "YouTube channel link",
+  telegram: "Telegram username or link",
+  leadSourceId: "Lead source identifier",
+  firstName: "First name of the lead",
+  lastName: "Last name of the lead",
+  middleName: "Middle name of the lead",
+  email: "Email address of the lead",
+  leadCategory: "Category identifier",
+  phone: "Phone number",
+  accountableManagerId: "Assigned manager ID",
+};

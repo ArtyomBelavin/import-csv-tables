@@ -1,21 +1,24 @@
 import React, { useState } from "react";
+import { useForm } from "react-hook-form";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { motion, AnimatePresence } from "framer-motion";
-import detectColumnType from "../utils/detectColumnType";
-import getDescription from "../utils/columnDescriptions";
-import LeadTable from "./LeadTable";
-import { LeadColumnInfo } from "../types";
+import { mapColumns } from "../utils/mapColumns";
+import type { LeadColumnInfo } from "../types";
+import { REQUIRED_FIELDS } from "../utils/requiredFields";
+import ColumnsTable from "./ColumnsTable";
 
-const REQUIRED_FIELDS = ["Name"];
+type FormValues = {
+  file: FileList;
+};
 
 export default function LeadImporter() {
-  const [headers, setHeaders] = useState<string[]>([]);
-  const [data, setData] = useState<any[]>([]);
-  const [columnsInfo, setColumnsInfo] = useState<LeadColumnInfo[]>([]);
+  const [columns, setColumns] = useState<LeadColumnInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+
+  const { register, handleSubmit, reset, setValue } = useForm<FormValues>();
 
   const handleFile = (file: File | null) => {
     if (!file) return;
@@ -27,10 +30,8 @@ export default function LeadImporter() {
         skipEmptyLines: true,
         complete: (res) => {
           const rows = res.data as any[];
-          setData(rows);
           const heads = Object.keys(rows[0] || {});
-          setHeaders(heads);
-          buildColumnsInfo(heads, rows);
+          setColumns(mapColumns(heads));
         },
       });
     } else if (["xls", "xlsx"].includes(ext)) {
@@ -39,30 +40,13 @@ export default function LeadImporter() {
         const wb = XLSX.read(e.target!.result, { type: "binary" });
         const sheet = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-        setData(rows);
         const heads = Object.keys(rows[0] || {});
-        setHeaders(heads);
-        buildColumnsInfo(heads, rows);
+        setColumns(mapColumns(heads));
       };
       reader.readAsBinaryString(file);
     } else {
       setError("Unsupported file format");
     }
-  };
-
-  const buildColumnsInfo = (heads: string[], rows: any[]) => {
-    const info: LeadColumnInfo[] = heads.map((h) => {
-      const values = rows.map((r) => r[h]);
-      const type = detectColumnType(values);
-      const required = REQUIRED_FIELDS.includes(h);
-      return {
-        name: h,
-        type,
-        status: required ? "Detected" : "Optional",
-        description: getDescription(h),
-      };
-    });
-    setColumnsInfo(info);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -80,41 +64,57 @@ export default function LeadImporter() {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0])
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleFile(e.dataTransfer.files[0]);
+      setValue("file", e.dataTransfer.files as any); // обновляем RHF
+    }
   };
 
-  const handleImport = async () => {
-    const missing = REQUIRED_FIELDS.filter((f) => !headers.includes(f));
+  const onSubmit = async () => {
+    const missing = REQUIRED_FIELDS.filter(
+      (f) => !columns.some((c) => c.mappedField === f)
+    );
     if (missing.length) {
       setError(`Missing required fields: ${missing.join(", ")}`);
       return;
     }
 
-    // Здесь замените на реальный POST к бэку (FormData или JSON) с обработкой 400/200
     try {
-      // Симуляция загрузки
-      await new Promise((r) => setTimeout(r, 800));
+      await new Promise((r) => setTimeout(r, 800)); // имитация POST
       setSuccess(true);
       setError(null);
+      setColumns([]); // очищаем таблицу
+      reset(); // сбрасываем форму (очищает инпут)
       setTimeout(() => setSuccess(false), 4000);
-    } catch (err) {
+    } catch {
       setError("Failed to import");
     }
   };
 
   return (
     <div className="p-8 bg-gray-50 min-h-screen">
-      <div className="max-w-4xl mx-auto bg-white shadow-lg rounded-2xl p-6">
-        <h1 className="text-2xl font-bold mb-4">Import Leads (CSV / Excel)</h1>
+      <div className="max-w-5xl mx-auto bg-white shadow-lg rounded-2xl p-6">
+        {/* Header */}
+        <h1 className="text-2xl font-bold mb-2">Import CSV File</h1>
         <p className="text-gray-600 mb-4">
-          Drop a CSV or Excel file here or click to select.
+          In the first row of your file, you must name the columns with English
+          words
         </p>
+        <a
+          href="/sample.csv"
+          className="text-blue-600 flex items-center gap-1 mb-6"
+        >
+          Download sample
+        </a>
 
+        {/* Table */}
+        {columns.length > 0 && <ColumnsTable columns={columns} />}
+
+        {/* Dropzone + input */}
         <form
           onDragEnter={handleDrag}
-          onSubmit={(e) => e.preventDefault()}
-          className={`border-2 border-dashed rounded-xl p-8 text-center transition ${
+          onSubmit={handleSubmit(onSubmit)}
+          className={`mt-6 border-2 border-dashed rounded-xl p-8 text-center transition ${
             dragActive ? "border-blue-500 bg-blue-50" : "border-gray-300"
           }`}
           onDrop={handleDrop}
@@ -125,6 +125,7 @@ export default function LeadImporter() {
             id="file"
             type="file"
             accept=".csv,.xls,.xlsx"
+            {...register("file")}
             onChange={handleFileUpload}
             className="hidden"
           />
@@ -147,38 +148,35 @@ export default function LeadImporter() {
               />
             </svg>
             <div className="text-blue-600 font-medium">
-              Select file or drag and drop
+              Select CSV file for import
             </div>
             <div className="text-sm text-gray-500">
-              We accept CSV, XLS, XLSX
+              or drag and drop the file into this area
             </div>
           </label>
-        </form>
 
-        <div className="flex justify-between items-center gap-4 mt-6">
-          <div />
-          <div>
+          {/* Import button */}
+          <div className="flex justify-center mt-6">
             <button
-              onClick={handleImport}
-              disabled={!data.length}
+              type="submit"
+              disabled={!columns.length}
               className={`px-6 py-3 rounded-xl shadow transition ${
-                data.length
+                columns.length
                   ? "bg-green-600 text-white hover:bg-green-700"
                   : "bg-gray-300 text-gray-600 cursor-not-allowed"
               }`}
             >
-              Import to system
+              Import
             </button>
           </div>
-        </div>
+        </form>
 
         {error && (
           <div className="text-red-600 font-semibold mt-4">{error}</div>
         )}
-
-        {columnsInfo.length > 0 && <LeadTable columnsInfo={columnsInfo} />}
       </div>
 
+      {/* Success alert */}
       <AnimatePresence>
         {success && (
           <motion.div
