@@ -100,12 +100,9 @@ export default function LeadImporter() {
           In the first row of your file, you must name the columns with English
           words
         </p>
-        <a
-          href="/sample.csv"
-          className="text-blue-600 flex items-center gap-1 mb-6"
-        >
+        <p className="text-blue-600 flex items-center gap-1 mb-6">
           Download sample
-        </a>
+        </p>
 
         {/* Table */}
         {columns.length > 0 && <ColumnsTable columns={columns} />}
