@@ -17,13 +17,29 @@ export default function LeadImporter() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const { register, handleSubmit, reset, setValue } = useForm<FormValues>();
 
+  // Конвертируем файл в Base64
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64String = (reader.result as string).split(",")[1]; // убираем префикс data:...
+        resolve(base64String);
+      };
+      reader.onerror = (error) => reject(error);
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleFile = (file: File | null) => {
     if (!file) return;
-    const ext = file.name.split(".").pop()!.toLowerCase();
 
+    setSelectedFile(file); // сохраняем файл
+
+    const ext = file.name.split(".").pop()!.toLowerCase();
     if (ext === "csv") {
       Papa.parse(file, {
         header: true,
@@ -66,11 +82,11 @@ export default function LeadImporter() {
     setDragActive(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleFile(e.dataTransfer.files[0]);
-      setValue("file", e.dataTransfer.files as any); // обновляем RHF
+      setValue("file", e.dataTransfer.files as any);
     }
   };
 
-  const onSubmit = async () => {
+  const onSubmit = handleSubmit(async () => {
     const missing = REQUIRED_FIELDS.filter(
       (f) => !columns.some((c) => c.mappedField === f)
     );
@@ -79,38 +95,52 @@ export default function LeadImporter() {
       return;
     }
 
+    if (!selectedFile) {
+      setError("No file selected");
+      return;
+    }
+
     try {
-      await new Promise((r) => setTimeout(r, 800)); // имитация POST
+      const base64File = await fileToBase64(selectedFile);
+
+      console.log(base64File);
+      // Отправка на бекенд
+      // const response = await fetch("YOUR_BACKEND_URL", {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify({ ImportFile: base64File }),
+      // });
+
+      // if (!response.ok) throw new Error("Failed to upload");
+
       setSuccess(true);
       setError(null);
-      setColumns([]); // очищаем таблицу
-      reset(); // сбрасываем форму (очищает инпут)
+      setColumns([]);
+      setSelectedFile(null);
+      reset();
       setTimeout(() => setSuccess(false), 4000);
-    } catch {
-      setError("Failed to import");
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || "Failed to import");
     }
-  };
+  });
 
   return (
     <div className="p-8 bg-gray-50 min-h-screen">
       <div className="max-w-5xl mx-auto bg-white shadow-lg rounded-2xl p-6">
-        {/* Header */}
-        <h1 className="text-2xl font-bold mb-2">Import CSV File</h1>
+        <h1 className="text-2xl font-bold mb-2">Import CSV/Excel File</h1>
         <p className="text-gray-600 mb-4">
-          In the first row of your file, you must name the columns with English
-          words
+          First row must contain column names in English.
         </p>
         <p className="text-blue-600 flex items-center gap-1 mb-6">
           Download sample
         </p>
 
-        {/* Table */}
         {columns.length > 0 && <ColumnsTable columns={columns} />}
 
-        {/* Dropzone + input */}
         <form
           onDragEnter={handleDrag}
-          onSubmit={handleSubmit(onSubmit)}
+          onSubmit={onSubmit}
           className={`mt-6 border-2 border-dashed rounded-xl p-8 text-center transition ${
             dragActive ? "border-blue-500 bg-blue-50" : "border-gray-300"
           }`}
@@ -145,14 +175,11 @@ export default function LeadImporter() {
               />
             </svg>
             <div className="text-blue-600 font-medium">
-              Select CSV file for import
+              Select CSV/Excel file
             </div>
-            <div className="text-sm text-gray-500">
-              or drag and drop the file into this area
-            </div>
+            <div className="text-sm text-gray-500">or drag and drop here</div>
           </label>
 
-          {/* Import button */}
           <div className="flex justify-center mt-6">
             <button
               type="submit"
@@ -173,7 +200,6 @@ export default function LeadImporter() {
         )}
       </div>
 
-      {/* Success alert */}
       <AnimatePresence>
         {success && (
           <motion.div
